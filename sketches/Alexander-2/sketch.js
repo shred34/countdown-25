@@ -12,6 +12,18 @@ let fingerGapSpring = new Spring({
   frequency: 3,
   halfLife: 0.1,
 });
+// Springs pour suivre la position du curseur avec les mains (plus réactifs)
+let handXSpring = new Spring({
+  position: 0,
+  frequency: 12,
+  halfLife: 0.02,
+});
+let handYSpring = new Spring({
+  position: 0,
+  frequency: 12,
+  halfLife: 0.02,
+});
+let handsInitialized = false; // Pour initialiser les springs à la première frame
 let wasDown = false;
 let time = 0;
 let fadeIn = 0;
@@ -30,6 +42,8 @@ pressSound.volume = 0.5;
 explodeSound.volume = 0.6;
 
 canvas.style.cursor = "none";
+
+const TWO_PI = Math.PI * 2;
 
 const rightHandSVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3601.22 472.78"><path d="M2,112.32l2616.99,20.58,163.88,3.49,54.16,2.42c.11,0,.22,0,.34-.01,2.33-.25,27.73-3.32,37.91-17.2s21.05-20.45,22.42-21.26c.09-.06.18-.1.28-.14l89.27-36.98s32.59-12.93,52.75-25.62c17.65-11.11,69.99-13.73,73.22-13.89.11,0,.21-.02.32-.04l63.98-12.62c.37-.07.72-.25,1.01-.5,4.75-3.99,9.67-3.52,11.71-3.09.65.14,1.31-.04,1.84-.45,11.25-8.69,25.23-3.74,28.58-2.35.5.21,1.05.22,1.56.06,4.93-1.58,6.43-.41,6.43-.41,26.06,14.85,51.3,8.62,53.06,8.16.07-.02.13-.04.2-.06,42.83-16.04,54.74-3.85,56.99-.67.29.41.43.91.4,1.41-2.14,34.4-33.95,52.45-33.95,52.45l-25.87,13.29c-1.94,1-1.43,3.9.73,4.18l142.8,18.26s153.39,12.2,172.56,52.29c18.59,38.86-39.81,44.97-43.4,45.3-.11.01-.22.01-.34,0l-130.56-7.83-105.49-7.49c-2.87-.2-3.3,4.07-.44,4.42,19.99,2.47,39.63,2.22,41.33,2.2.08,0,.16,0,.24-.02,61.98-8.22,74.51,22.77,75.62,25.91.06.16.09.33.11.5,6.01,57.29-16.59,65.02-16.59,65.02,0,0-9.59,8.81-51.42,2.71-31.32-4.57-69-2.3-85.95-.87-2.46.21-2.81,3.69-.43,4.35,7.37,2.06,14.98,2.56,15.73,2.61.04,0,.08,0,.12,0,93.49.02,106.35,33.42,107.1,35.62.03.08.04.15.06.23.37,1.75,4.64,23.81-8.74,53.54-13.94,30.99-139.44,0-139.44,0,0,0,75.82,16.07,77.56,40.48,1.6,22.38-9.99,35.96-11.93,38.06-.17.19-.37.34-.6.46-30.39,16.35-59.85,11.15-70.27,11.15s-131.25-5.91-135-6.1c-.06,0-.11,0-.17-.02-2-.27-39.44-5.22-81.84-5.22s-180.37-51.93-187.92-54.78c-.22-.08-.44-.13-.67-.14-59.95-2.68-101.65-22.65-119.92-23.52-18.3-.87-202.88,0-202.88,0L2.01,378.65V112.32Z" style="fill:#d6aa99; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M2737.42,372.57s-7.7-23.93,1.1-47.59" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M2791.34,389.62s31.09-16.51,23.66-68.22" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M2933.56,269.41s168.59,26.14,228.77,55.56" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M2935.86,229.91s86.55-11.94,122.98-9.19c36.42,2.76,83.74-8.27,83.74-8.27,0,0,24.68-5.79,88.54-1.69" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3061.58,160.32s123.47-66.94,173.61-42.73" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M2991.71,77.07s31.03-27.64,72.71-37.15" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3178.11,10.94s-1.05,4.03,4.3,8.67" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3191.23,7.72s2.42,3.77,5.73,6.18" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3203.55,2.26s1.61,6.37,13.12,18.77,9.9,15.97,9.9,15.97" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3237.91,8.76s5.62,7.81,7.49,23.87" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3328.47,5.47v5.34c0,11.94-2.83,12.91-2.83,12.91,0,0-16.96,7.44-31.25,5.51s-12.56-16.77-12.56-16.77c0,0,11-6.53,31.46-7.9,10.62-.71,15.18.93,15.18.93Z" style="fill:#e5d8a3; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3281.04,452.61s19.31-22.37,19.55-45.45" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3298.23,446.12s8.95-19.78,10.6-28.97" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3308,450.6s4-.71,6.83-10.72" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3357.69,388.66s22.37-35.56,18.13-73.48" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3380.07,374.52s12.25-11.78,11.3-44.04" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3393.33,253.23s8.48-25.67-1.65-49.93" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3407.66,264.3s4.45-29.44,1.62-46.4" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3424.46,247.11s-2.36-13.19-2.36-18.84-4.73-14.48-4.73-14.48" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3398.35,173.16s-12.2-22,4.25-62.49" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3411.85,158.37s4.07-6.66,2.96-41.97" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3425.72,178.33s28.1-21.26,2.77-68.97" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3051.08,108.1s-3.51-3.88,5.73-21.63" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3063.83,116.42s0-16.25,7.77-38.09" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3589.49,145.67c-28.26-5.47-29.38,3.18-29.38,3.18,0,0-2.62,9.66-4.91,26.86s26.23,15.63,26.23,15.63c0,0,17.96-9.2,17.79-23.72s-9.73-21.95-9.73-21.95Z" style="fill:#eada96; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/><path d="M3218.23,13.9s2.9-2.69,3.2-8.91" style="fill:none; stroke:#000; stroke-miterlimit:10; stroke-width:4px;"/></svg>`;
 
@@ -149,7 +163,7 @@ class Pimple {
   generateJets() {
     this.jets = [];
     for (let j = 0; j < 12; j++) {
-      const jetAngle = (j / 12) * Math.PI * 2;
+      const jetAngle = (j / 12) * TWO_PI;
       const particles = [];
       for (let i = 0; i < 25; i++) {
         const angle = jetAngle + (Math.random() - 0.5) * 0.4;
@@ -197,7 +211,7 @@ class Pimple {
     ctx.beginPath();
     for (let p of innerParticles) {
       ctx.moveTo(p.x + p.size, p.y);
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, p.size, 0, TWO_PI);
     }
     ctx.fill();
 
@@ -219,7 +233,7 @@ class Pimple {
     const data = this.maskImageData.data;
 
     for (let i = 0; i < checks; i++) {
-      const angle = (i / checks) * Math.PI * 2;
+      const angle = (i / checks) * TWO_PI;
       const checkX = Math.round(p.x + Math.cos(angle) * p.size);
       const checkY = Math.round(p.y + Math.sin(angle) * p.size);
 
@@ -246,7 +260,7 @@ class Pimple {
       for (let jet of this.jets) {
         for (let p of jet) {
           ctx.moveTo(p.x + p.size, p.y);
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, p.size, 0, TWO_PI);
         }
       }
       ctx.fill();
@@ -360,6 +374,26 @@ function update(dt) {
     my = canvas.height / 2;
   }
 
+  // Initialiser les springs des mains à la position actuelle du curseur
+  // pour éviter la téléportation lors de l'apparition
+  if (!handsInitialized) {
+    handXSpring.position = mx;
+    handXSpring.velocity = 0;
+    handYSpring.position = my;
+    handYSpring.velocity = 0;
+    handsInitialized = true;
+  }
+
+  // Mettre à jour les springs pour suivre le curseur
+  handXSpring.target = mx;
+  handYSpring.target = my;
+  handXSpring.step(dt);
+  handYSpring.step(dt);
+
+  // Positions lissées pour les mains
+  const handMx = handXSpring.position;
+  const handMy = handYSpring.position;
+
   if (fadeIn < 1) fadeIn = Math.min(fadeIn + dt * 0.5, 1);
   if (handsIntroProgress < 1)
     handsIntroProgress = Math.min(handsIntroProgress + dt * 0.5, 1); // Animation sur 2 secondes
@@ -378,7 +412,6 @@ function update(dt) {
     // Appeler finish() quand l'écran est complètement noir (fadeOut >= 1)
     if (fadeOut >= 1 && !finishCalled) {
       finishCalled = true;
-      console.log("Calling finish() - fadeOut:", fadeOut);
       finish();
     }
   }
@@ -397,11 +430,14 @@ function update(dt) {
   fingerGapSpring.step(dt);
   pimples.forEach((p) => p.update(dt, mx, my, clicked, down));
 
-  const skinAlpha = fadeIn * (1 - fadeOut);
-  ctx.fillStyle = `rgba(248, 192, 165, ${skinAlpha})`;
+  // Fond noir puis peau beige
+  ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (skinAlpha < 1) {
-    ctx.fillStyle = `rgba(0, 0, 0, ${1 - skinAlpha})`;
+
+  // Dessiner la peau (le fadeOut sera géré par l'overlay noir à la fin)
+  const skinAlpha = fadeIn;
+  if (skinAlpha > 0) {
+    ctx.fillStyle = `rgba(248, 192, 165, ${skinAlpha})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
@@ -418,9 +454,7 @@ function update(dt) {
   tempCtx.drawImage(maskCanvas, 0, 0);
   tempCtx.globalCompositeOperation = "source-over";
 
-  ctx.globalAlpha = Math.max(0, 1 - Math.max(0, (fadeOut - 0.3) * 1.43));
   ctx.drawImage(tempCanvas, 0, 0);
-  ctx.globalAlpha = 1;
 
   pimples.forEach((p) => {
     if (
@@ -429,12 +463,12 @@ function update(dt) {
       p.fadeOutProgress < 1 &&
       p.outsideParticles.length > 0
     ) {
-      const alpha = 0.85 * (1 - p.fadeOutProgress) * (1 - fadeOut);
+      const alpha = 0.85 * (1 - p.fadeOutProgress);
       ctx.fillStyle = `rgba(231, 226, 200, ${alpha})`;
       ctx.beginPath();
       for (let particle of p.outsideParticles) {
         ctx.moveTo(particle.x + particle.size, particle.y);
-        ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+        ctx.arc(particle.x, particle.y, particle.size, 0, TWO_PI);
       }
       ctx.fill();
     }
@@ -445,10 +479,10 @@ function update(dt) {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.filter = "blur(12px)";
-      ctx.globalAlpha = 0.5 * (1 - fadeOut);
+      ctx.globalAlpha = 0.5;
       ctx.fillStyle = "#ff4444";
       ctx.beginPath();
-      ctx.arc(0, 0, p.size * 1.2, 0, Math.PI * 2);
+      ctx.arc(0, 0, p.size * 1.2, 0, TWO_PI);
       ctx.fill();
       ctx.filter = "none";
       ctx.restore();
@@ -459,19 +493,20 @@ function update(dt) {
     (p) => p.popped && p.edgeParticles && p.edgeParticles.length > 0
   );
   if (hasEdgeParticles) {
-    ctx.fillStyle = `rgba(231, 226, 200, ${0.85 * (1 - fadeOut)})`;
+    ctx.fillStyle = `rgba(231, 226, 200, 0.85)`;
     ctx.beginPath();
     pimples.forEach((p) => {
       if (p.popped && p.edgeParticles) {
         for (let particle of p.edgeParticles) {
           ctx.moveTo(particle.x + particle.size, particle.y);
-          ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          ctx.arc(particle.x, particle.y, particle.size, 0, TWO_PI);
         }
       }
     });
     ctx.fill();
   }
 
+  // Dessiner les boutons
   pimples.forEach((p) => {
     if (!p.exploding && !p.popped) {
       p.drawButton(ctx);
@@ -484,7 +519,7 @@ function update(dt) {
     handHeight = 300,
     handOffset = 1200,
     fingerSpacing = 1142,
-    armY = my - handHeight / 2 + 50 + 71.5;
+    armY = handMy - handHeight / 2 + 50 + 71.5;
 
   // Animations d'arrivee et depart avec smoothstep
   const intro =
@@ -494,14 +529,14 @@ function update(dt) {
 
   // Calcul des positions X des mains
   const leftHandX =
-    mx -
+    handMx -
     handOffset +
     gap / 2 +
     fingerSpacing +
     canvas.width * (1 - intro) +
     canvas.width * outro;
   const rightHandX =
-    mx -
+    handMx -
     handOffset -
     gap / 2 -
     fingerSpacing -
@@ -513,7 +548,7 @@ function update(dt) {
     ctx.drawImage(
       leftHandImg,
       leftHandX,
-      my - handHeight / 2 + 50,
+      handMy - handHeight / 2 + 50,
       handWidth,
       handHeight
     );
@@ -521,7 +556,7 @@ function update(dt) {
     ctx.drawImage(
       rightHandImg,
       rightHandX,
-      my - handHeight / 2 + 50,
+      handMy - handHeight / 2 + 50,
       handWidth,
       handHeight
     );
@@ -564,6 +599,12 @@ function update(dt) {
   ctx.moveTo(rightArmX, rightArmY + armExtensionHeight);
   ctx.lineTo(rightArmX + armExtensionWidth, rightArmY + armExtensionHeight);
   ctx.stroke();
+
+  // Overlay noir pour le fadeOut final (dessiner PAR-DESSUS tout le contenu)
+  if (fadeOut > 0) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${fadeOut})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 run(update);

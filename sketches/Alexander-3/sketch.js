@@ -34,6 +34,8 @@ const pivot = { x: 313, y: 83 },
 
 canvas.style.cursor = "none";
 
+const TWO_PI = Math.PI * 2;
+
 // Charge les trois sons
 const sounds = {
   razor: new Audio("../sample-audio/assets/rasoir.mp3"),
@@ -173,7 +175,7 @@ class Hair {
       if (o > 0.01) {
         ctx.fillStyle = `rgba(255,255,255,${o})`;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, 2, 0, TWO_PI);
         ctx.fill();
       }
     } else {
@@ -200,7 +202,7 @@ class Hair {
       if (o > 0.01) {
         ctx.fillStyle = `rgba(255,255,255,${o})`;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, 2, 0, TWO_PI);
         ctx.fill();
       }
     }
