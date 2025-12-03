@@ -38,8 +38,8 @@ buttonImg.src = "../sample-audio/assets/bouton.png";
 // Charger les sons
 const pressSound = new Audio("../sample-audio/assets/press.mp3");
 const explodeSound = new Audio("../sample-audio/assets/explose.mp3");
-pressSound.volume = 0.5;
-explodeSound.volume = 0.6;
+pressSound.volume = 0.9;
+explodeSound.volume = 1.0;
 
 canvas.style.cursor = "none";
 
