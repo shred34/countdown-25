@@ -369,14 +369,10 @@ function update(dt) {
 
   // Utiliser le centre si le curseur n'a pas encore été détecté
   const cursorActive = input.hasStarted();
-  if (!cursorActive) {
-    mx = canvas.width / 2;
-    my = canvas.height / 2;
-  }
 
   // Initialiser les springs des mains à la position actuelle du curseur
-  // pour éviter la téléportation lors de l'apparition
-  if (!handsInitialized) {
+  // seulement quand le curseur est détecté pour la première fois
+  if (!handsInitialized && cursorActive) {
     handXSpring.position = mx;
     handXSpring.velocity = 0;
     handYSpring.position = my;
@@ -384,18 +380,20 @@ function update(dt) {
     handsInitialized = true;
   }
 
-  // Mettre à jour les springs pour suivre le curseur
-  handXSpring.target = mx;
-  handYSpring.target = my;
-  handXSpring.step(dt);
-  handYSpring.step(dt);
+  // Mettre à jour les springs pour suivre le curseur (seulement si initialisé)
+  if (handsInitialized) {
+    handXSpring.target = mx;
+    handYSpring.target = my;
+    handXSpring.step(dt);
+    handYSpring.step(dt);
+  }
 
   // Positions lissées pour les mains
-  const handMx = handXSpring.position;
-  const handMy = handYSpring.position;
+  const handMx = handsInitialized ? handXSpring.position : 0;
+  const handMy = handsInitialized ? handYSpring.position : 0;
 
   if (fadeIn < 1) fadeIn = Math.min(fadeIn + dt * 0.5, 1);
-  if (handsIntroProgress < 1)
+  if (cursorActive && handsIntroProgress < 1)
     handsIntroProgress = Math.min(handsIntroProgress + dt * 0.5, 1); // Animation sur 2 secondes
 
   pimples.forEach((p) => p.updatePopIn(dt, fadeIn));
