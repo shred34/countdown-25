@@ -42,16 +42,33 @@ canvas.style.cursor = "none";
 const TWO_PI = Math.PI * 2;
 
 // Configuration du coton-tige
-// Scale adaptatif : utilise 3.4 pour petit/moyen écran, mais se limite pour grand écran
-function getSwabScale() {
-  const baseScale = 3.4;
-  const screenRatio = Math.min(canvas.width / 1920, canvas.height / 1080);
-  // Limiter le scale pour qu'il ne grossisse pas trop sur grand écran
-  return baseScale * Math.min(screenRatio, 1.2);
-}
-const SWAB_PIVOT = { x: 150, y: 75 };
+const SWAB_SCALE = 3.4;
+// SWAB_PIVOT = centre de rotation du coton-tige (en coordonnées SVG viewBox 200x250)
+// Le curseur sera exactement à ce point. Ajuste x/y pour déplacer le pivot.
+const SWAB_PIVOT = { x: 100, y: 125 }; // Centre du bâtonnet
 const COTTON_TOP = { x: 100, y: 10, radius: 10 };
 const COTTON_BOTTOM = { x: 200, y: 140, radius: 10 };
+
+// Debug et ajustements Chrome: active les marqueurs et ajuste l'alignement des zones
+// dx/dy s'expriment dans le repère SVG (avant rotation), en unités du viewBox
+// radiusMul permet d'élargir/réduire le rayon effectif de détection
+const DEBUG_MARKERS = false; // mets à true pour afficher les marqueurs
+const DETECT_TWEAK_SVG = {
+  top: { dx: -85, dy: 5, radiusMul: 1.3 },
+  bottom: { dx: -14, dy: 96, radiusMul: 1.3 },
+};
+
+// Décalage VISUEL du coton-tige par rapport au curseur (n'affecte PAS la détection)
+// Utile si le centre du curseur ne correspond pas exactement au pivot visuel du batonnet
+const VISUAL_SWAB_OFFSET = { dx: 170, dy: -170 };
+
+// AJUSTEMENT MANUEL des taches de cérumen (en unités SVG, avant scale)
+// Change ces valeurs pour déplacer les taches par rapport aux marqueurs rouges
+// radiusMul: multiplicateur de taille (1.0 = taille normale, 0.5 = moitié, 2.0 = double)
+const STAIN_OFFSET = {
+  top: { dx: 0, dy: 0, radiusMul: 0.7 }, // Décalage pour le coton du haut
+  bottom: { dx: 0, dy: 0, radiusMul: 0.7 }, // Décalage pour le coton du bas
+};
 
 // Chargement des SVG
 const svgImages = { earwax: null, ear: null, swab: null, loaded: 0 };
@@ -130,14 +147,13 @@ function rotatePoint(x, y, angle, pivot) {
 }
 
 function getCottonCenters(x, y, scale, rotation) {
-  const adaptiveScale = getSwabScale();
   const centers = [];
   const cottons = [COTTON_TOP, COTTON_BOTTOM];
   for (let cotton of cottons) {
     const rotated = rotatePoint(cotton.x, cotton.y, rotation, SWAB_PIVOT);
     centers.push({
-      x: x + (rotated.x - SWAB_PIVOT.x) * adaptiveScale,
-      y: y + (rotated.y - SWAB_PIVOT.y) * adaptiveScale,
+      x: x + (rotated.x - SWAB_PIVOT.x) * scale,
+      y: y + (rotated.y - SWAB_PIVOT.y) * scale,
     });
   }
   return centers; // [topCenter, bottomCenter]
@@ -145,15 +161,22 @@ function getCottonCenters(x, y, scale, rotation) {
 
 function drawSwab(x, y, scale, rotation) {
   if (!svgImages.swab) return;
-  const adaptiveScale = getSwabScale();
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
-  ctx.scale(adaptiveScale, adaptiveScale);
-  ctx.translate(-SWAB_PIVOT.x, -SWAB_PIVOT.y);
 
-  // Dessiner le coton-tige blanc
-  ctx.drawImage(svgImages.swab, 0, 0);
+  // Dimensions du SVG viewBox
+  const svgViewBoxWidth = 200.22;
+  const svgViewBoxHeight = 249.94;
+
+  // Calculer la taille finale et le pivot
+  const finalWidth = svgViewBoxWidth * scale;
+  const finalHeight = svgViewBoxHeight * scale;
+  const pivotX = SWAB_PIVOT.x * scale;
+  const pivotY = SWAB_PIVOT.y * scale;
+
+  // Dessiner le coton-tige blanc avec taille explicite
+  ctx.drawImage(svgImages.swab, -pivotX, -pivotY, finalWidth, finalHeight);
 
   // Fonction helper pour dessiner une forme organique
   const drawOrganicBlob = (cx, cy, radius, seed) => {
@@ -207,80 +230,99 @@ function drawSwab(x, y, scale, rotation) {
     const level = cottonDirtyLevel[index];
     const seed = index * 3.7; // Seed différent pour chaque coton
 
+    // Récupérer les tweaks pour positionner les taches exactement sur les marqueurs
+    const tweak = index === 0 ? DETECT_TWEAK_SVG.top : DETECT_TWEAK_SVG.bottom;
+    const dx = tweak && typeof tweak.dx === "number" ? tweak.dx : 0;
+    const dy = tweak && typeof tweak.dy === "number" ? tweak.dy : 0;
+    const rMul =
+      tweak && typeof tweak.radiusMul === "number" ? tweak.radiusMul : 1;
+
+    // Récupérer l'offset manuel de tache pour ce coton
+    const stainOffset = index === 0 ? STAIN_OFFSET.top : STAIN_OFFSET.bottom;
+    const sdx = stainOffset.dx || 0;
+    const sdy = stainOffset.dy || 0;
+    const srMul = stainOffset.radiusMul || 1.0; // Multiplicateur de taille des taches
+
     if (level >= 1) {
       // Niveau 1: Petites taches organiques (15%)
-      // Adapter la taille au scale du coton-tige
-      const scaleRatio = getSwabScale() / 3.4;
       ctx.globalAlpha = 0.75;
       for (let i = 0; i < 3; i++) {
         const angle = (i / 3) * TWO_PI + seed;
-        const dist = cotton.radius * 0.2 * scaleRatio;
-        const size = cotton.radius * 0.15 * scaleRatio;
-        drawOrganicBlob(
-          cotton.x + Math.cos(angle) * dist,
-          cotton.y + Math.sin(angle) * dist,
-          size,
-          seed + i
-        );
+        const dist = cotton.radius * 0.5 * rMul * srMul;
+        const size = cotton.radius * 0.4 * rMul * srMul;
+        // Coordonnées SVG avec offsets + ajustement manuel, puis soustraire pivot, puis MULTIPLIER par scale
+        const localX =
+          (cotton.x + dx + sdx + Math.cos(angle) * dist - SWAB_PIVOT.x) * scale;
+        const localY =
+          (cotton.y + dy + sdy + Math.sin(angle) * dist - SWAB_PIVOT.y) * scale;
+        drawOrganicBlob(localX, localY, size * scale, seed + i);
       }
     }
 
     if (level >= 2) {
       // Niveau 2: Plus de taches, zone élargie (30%)
-      const scaleRatio = getSwabScale() / 3.4;
+      const scaleRatio = (SWAB_SCALE / 3.4) * rMul;
       ctx.globalAlpha = 0.8;
       for (let i = 0; i < 6; i++) {
         const angle = (i / 6) * TWO_PI + seed * 0.7;
-        const dist = cotton.radius * (0.15 + (i % 2) * 0.25) * scaleRatio;
-        const size = cotton.radius * (0.12 + (i % 3) * 0.08) * scaleRatio;
-        drawOrganicBlob(
-          cotton.x + Math.cos(angle) * dist,
-          cotton.y + Math.sin(angle) * dist,
-          size,
-          seed + i * 1.2
-        );
+        const dist = cotton.radius * (0.4 + (i % 2) * 0.5) * scaleRatio * srMul;
+        const size = cotton.radius * (0.3 + (i % 3) * 0.2) * scaleRatio * srMul;
+        // Coordonnées SVG avec offsets + ajustement manuel, puis soustraire pivot, puis MULTIPLIER par scale
+        const localX =
+          (cotton.x + dx + sdx + Math.cos(angle) * dist - SWAB_PIVOT.x) * scale;
+        const localY =
+          (cotton.y + dy + sdy + Math.sin(angle) * dist - SWAB_PIVOT.y) * scale;
+        drawOrganicBlob(localX, localY, size * scale, seed + i * 1.2);
       }
       // Centre organique
+      const centerX = (cotton.x + dx + sdx - SWAB_PIVOT.x) * scale;
+      const centerY = (cotton.y + dy + sdy - SWAB_PIVOT.y) * scale;
       drawOrganicBlob(
-        cotton.x,
-        cotton.y,
-        cotton.radius * 0.25 * scaleRatio,
+        centerX,
+        centerY,
+        cotton.radius * 0.6 * scaleRatio * scale * srMul,
         seed + 10
       );
     }
 
     if (level >= 3) {
       // Niveau 3: Presque plein avec taches organiques (45%)
-      const scaleRatio = getSwabScale() / 3.4;
+      const scaleRatio = (SWAB_SCALE / 3.4) * rMul;
       ctx.globalAlpha = 0.85;
       for (let i = 0; i < 10; i++) {
         const angle = (i / 10) * TWO_PI + seed * 0.9;
-        const dist = cotton.radius * (0.1 + (i % 4) * 0.2) * scaleRatio;
-        const size = cotton.radius * (0.15 + (i % 3) * 0.1) * scaleRatio;
-        drawOrganicBlob(
-          cotton.x + Math.cos(angle) * dist,
-          cotton.y + Math.sin(angle) * dist,
-          size,
-          seed + i * 0.8
-        );
+        const dist = cotton.radius * (0.3 + (i % 4) * 0.5) * scaleRatio * srMul;
+        const size =
+          cotton.radius * (0.4 + (i % 3) * 0.25) * scaleRatio * srMul;
+        // Coordonnées SVG avec offsets + ajustement manuel, puis soustraire pivot, puis MULTIPLIER par scale
+        const localX =
+          (cotton.x + dx + sdx + Math.cos(angle) * dist - SWAB_PIVOT.x) * scale;
+        const localY =
+          (cotton.y + dy + sdy + Math.sin(angle) * dist - SWAB_PIVOT.y) * scale;
+        drawOrganicBlob(localX, localY, size * scale, seed + i * 0.8);
       }
       // Zone centrale large organique
+      const centerX = (cotton.x + dx + sdx - SWAB_PIVOT.x) * scale;
+      const centerY = (cotton.y + dy + sdy - SWAB_PIVOT.y) * scale;
       drawOrganicBlob(
-        cotton.x,
-        cotton.y,
-        cotton.radius * 0.5 * scaleRatio,
+        centerX,
+        centerY,
+        cotton.radius * 1.2 * scaleRatio * scale * srMul,
         seed + 20
       );
     }
 
     if (level >= 4) {
       // Niveau 4: Complètement sale avec forme organique (50%)
-      const scaleRatio = getSwabScale() / 3.4;
+      const scaleRatio = (SWAB_SCALE / 3.4) * rMul;
       ctx.globalAlpha = 0.9;
+      // Coordonnées SVG avec offsets + ajustement manuel, puis soustraire pivot, puis MULTIPLIER par scale
+      const centerX = (cotton.x + dx + sdx - SWAB_PIVOT.x) * scale;
+      const centerY = (cotton.y + dy + sdy - SWAB_PIVOT.y) * scale;
       drawOrganicBlob(
-        cotton.x,
-        cotton.y,
-        cotton.radius * 0.95 * scaleRatio,
+        centerX,
+        centerY,
+        cotton.radius * 2.0 * scaleRatio * scale * srMul,
         seed + 30
       );
     }
@@ -307,7 +349,7 @@ function getCleanPercentage() {
 function drawEarWithWax(fadeOut) {
   if (!svgImages.ear || !svgImages.earwax || !earwaxMaskCanvas) return;
 
-  const earScale = getSwabScale();
+  const earScale = 3.4;
   const earWidth = 161.16 * earScale;
   const earHeight = 239.46 * earScale;
   const earX = centerX - earWidth / 2;
@@ -411,8 +453,13 @@ function update(dt) {
     swabRotSpeed += 1.5 * dt;
     swabRotation += swabRotSpeed * dt;
   } else if (onCanvas) {
+    // Mouvement fluide avec lerp (comme Alexander-3)
     swabX += (mx - swabX) * 0.2;
     swabY += (my - swabY) * 0.2;
+  } else {
+    // Quand le curseur sort et revient, on téléporte pour que le lerp reprenne
+    swabX = mx;
+    swabY = my;
   }
 
   // Animation rotation FLUIDE
@@ -459,11 +506,16 @@ function update(dt) {
   // EFFACEMENT au SURVOL (les DEUX cotons nettoient simultanément mais se tachent indépendamment)
   // IMPORTANT : Effacement désactivé pendant l'animation d'apparition (fadeIn < 1)
   if (onCanvas && !fall && fadeIn >= 1 && !bothCottonsFull) {
-    const adaptiveScale = getSwabScale();
     const cottons = [COTTON_TOP, COTTON_BOTTOM];
 
     // Pour chaque coton
     cottons.forEach((cotton, cottonIndex) => {
+      const tweak =
+        cottonIndex === 0 ? DETECT_TWEAK_SVG.top : DETECT_TWEAK_SVG.bottom;
+      const dx = tweak && typeof tweak.dx === "number" ? tweak.dx : 0;
+      const dy = tweak && typeof tweak.dy === "number" ? tweak.dy : 0;
+      const rMul =
+        tweak && typeof tweak.radiusMul === "number" ? tweak.radiusMul : 1;
       // Vérifier si ce coton n'est pas complètement sale (niveau < 4)
       if (cottonDirtyLevel[cottonIndex] < 4) {
         // Générer les points de collision pour ce coton
@@ -471,26 +523,29 @@ function update(dt) {
         for (let i = 0; i <= 12; i++) {
           const angle = (i / 12) * TWO_PI;
           for (let r = 0; r <= 1; r += 0.5) {
-            const px = cotton.x + Math.cos(angle) * cotton.radius * r;
-            const py = cotton.y + Math.sin(angle) * cotton.radius * r;
+            // Appliquer l'offset (dx,dy) et le multiplicateur de rayon avant rotation
+            const px =
+              cotton.x + dx + Math.cos(angle) * cotton.radius * r * rMul;
+            const py =
+              cotton.y + dy + Math.sin(angle) * cotton.radius * r * rMul;
             const rotated = rotatePoint(px, py, swabRotation, SWAB_PIVOT);
             swabPts.push({
-              x: swabX + (rotated.x - SWAB_PIVOT.x) * adaptiveScale,
-              y: swabY + (rotated.y - SWAB_PIVOT.y) * adaptiveScale,
+              x: swabX + (rotated.x - SWAB_PIVOT.x) * SWAB_SCALE,
+              y: swabY + (rotated.y - SWAB_PIVOT.y) * SWAB_SCALE,
             });
           }
         }
 
         // Vérifier si on est dans la zone de l'oreille (centre de l'écran)
+        const centerRot = rotatePoint(
+          cotton.x + dx,
+          cotton.y + dy,
+          swabRotation,
+          SWAB_PIVOT
+        );
         const cottonCenter = {
-          x:
-            swabX +
-            (cotton.x - SWAB_PIVOT.x) * adaptiveScale * Math.cos(swabRotation) -
-            (cotton.y - SWAB_PIVOT.y) * adaptiveScale * Math.sin(swabRotation),
-          y:
-            swabY +
-            (cotton.x - SWAB_PIVOT.x) * adaptiveScale * Math.sin(swabRotation) +
-            (cotton.y - SWAB_PIVOT.y) * adaptiveScale * Math.cos(swabRotation),
+          x: swabX + (centerRot.x - SWAB_PIVOT.x) * SWAB_SCALE,
+          y: swabY + (centerRot.y - SWAB_PIVOT.y) * SWAB_SCALE,
         };
         const distToCenter = Math.hypot(
           cottonCenter.x - centerX,
@@ -503,10 +558,36 @@ function update(dt) {
         earwaxMaskCtx.fillStyle = "rgba(0, 0, 0, 0.2)";
         for (let pt of swabPts) {
           earwaxMaskCtx.beginPath();
-          earwaxMaskCtx.arc(pt.x, pt.y, cotton.radius, 0, TWO_PI);
+          earwaxMaskCtx.arc(pt.x, pt.y, cotton.radius * rMul, 0, TWO_PI);
           earwaxMaskCtx.fill();
         }
         earwaxMaskCtx.globalCompositeOperation = "source-over";
+
+        // Marqueurs visuels (rouge) pour ajuster
+        if (DEBUG_MARKERS) {
+          ctx.save();
+          ctx.strokeStyle = "rgba(255,0,0,0.9)";
+          ctx.fillStyle = "rgba(255,0,0,0.6)";
+          ctx.lineWidth = 2;
+          // Cercle principal du coton (avec rMul)
+          ctx.beginPath();
+          ctx.arc(
+            cottonCenter.x,
+            cottonCenter.y,
+            cotton.radius * SWAB_SCALE * rMul,
+            0,
+            TWO_PI
+          );
+          ctx.stroke();
+          // Quelques points d'échantillonnage
+          for (let i = 0; i < swabPts.length; i += 6) {
+            const p = swabPts[i];
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4, 0, TWO_PI);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
 
         // Si ce coton est proche de l'oreille, il se tache
         if (isNearEar) {
@@ -539,8 +620,10 @@ function update(dt) {
   }
 
   // Coton-tige
+  // La rotation se fait autour du curseur (swabX, swabY)
+  // VISUAL_SWAB_OFFSET est maintenant appliqué DANS le repère rotatif
   if (onCanvas && swabY > -200 && swabY < canvas.height + 300) {
-    drawSwab(swabX, swabY, getSwabScale(), swabRotation);
+    drawSwab(swabX, swabY, SWAB_SCALE, swabRotation);
   }
 
   // Fade noir au début (par-dessus tout pour que le 0 et cérumen apparaissent en dessous)
@@ -553,6 +636,26 @@ function update(dt) {
   if (fadeOut > 0) {
     ctx.fillStyle = `rgba(0, 0, 0, ${fadeOut})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Marqueur de position du curseur (debug)
+  if (DEBUG_MARKERS) {
+    ctx.save();
+    const r = 10;
+    ctx.strokeStyle = "rgba(0, 200, 255, 0.95)"; // cyan pour différencier
+    ctx.lineWidth = 2;
+    // Cercle
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, TWO_PI);
+    ctx.stroke();
+    // Croix
+    ctx.beginPath();
+    ctx.moveTo(mx - r - 4, my);
+    ctx.lineTo(mx + r + 4, my);
+    ctx.moveTo(mx, my - r - 4);
+    ctx.lineTo(mx, my + r + 4);
+    ctx.stroke();
+    ctx.restore();
   }
 
   // INDICATEUR VISUEL DE SECOUAGE (debug)
