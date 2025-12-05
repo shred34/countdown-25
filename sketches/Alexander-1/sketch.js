@@ -145,17 +145,16 @@ class ScabPiece {
     scratchPointsScreenSpace
   ) {
     const screenX =
-      canvas.width / 2 + (this.originalX + this.offsetX - refWidth / 2) * scale;
+      currentCenterX + (this.originalX + this.offsetX - refWidth / 2) * scale;
     const screenY =
-      canvas.height / 2 +
-      (this.originalY + this.offsetY - refHeight / 2) * scale;
+      currentCenterY + (this.originalY + this.offsetY - refHeight / 2) * scale;
 
     if (this.falling) {
       this.y += this.vy * dt;
       this.vy += 600 * dt;
       this.rotation += this.rotSpeed * dt;
       const fallY =
-        canvas.height / 2 + (this.offsetY + this.y - refHeight / 2) * scale;
+        currentCenterY + (this.offsetY + this.y - refHeight / 2) * scale;
       return { alive: fallY < canvas.height + 100, justFell: false };
     }
 
@@ -326,6 +325,10 @@ for (
 const fallenClusters = new Set();
 const smoothstep = (t) => t * t * (3 - 2 * t);
 
+// Variables pour le responsive - centres dynamiques
+let currentCenterX = canvas.width / 2;
+let currentCenterY = canvas.height / 2;
+
 function update(dt) {
   time += dt;
   const mx = input.getX(),
@@ -373,7 +376,7 @@ function update(dt) {
 
   const introOff = canvas.height * 1.5 * (1 - smoothstep(handIntroProgress));
   const outroOff = canvas.height * 1.5 * smoothstep(handOutroProgress);
-  const scale = canvas.height / refHeight;
+  const scale = 1; // Garder la taille fixe sans mise à l'échelle
 
   // Pré-calculer les positions des points de grattage
   const handX = handMx - handWidth * 0.5;
@@ -465,7 +468,7 @@ function update(dt) {
 
   // Rougeur pré-blurée en cache (même visuel, sans re-blur ni re-rendu à chaque frame)
   if (fadeIn > 0) {
-    const rednessScale = canvas.height / refHeight;
+    const rednessScale = 1; // Garder la taille fixe
 
     // Initialiser et rendre UNE FOIS le canvas de rougeur (pré-blur)
     if (!rednessCanvas) {
@@ -476,7 +479,7 @@ function update(dt) {
       // debug
 
       rednessCtx.save();
-      rednessCtx.translate(canvas.width / 2, canvas.height / 2);
+      rednessCtx.translate(currentCenterX, currentCenterY);
       rednessCtx.scale(rednessScale, rednessScale);
       rednessCtx.translate(-refWidth / 2, -refHeight / 2);
 
@@ -562,7 +565,7 @@ function update(dt) {
   }
 
   if (bloodVideo.readyState >= 2) {
-    const vScale = canvas.height / bloodVideo.videoHeight;
+    const vScale = 1; // Garder la taille fixe
     const alpha =
       fadeOutStart !== -1 ? 1 - Math.min((time - fadeOutStart) / 1, 1) : 1;
     if (alpha > 0) {
@@ -602,10 +605,10 @@ function update(dt) {
       ctx.globalAlpha = alpha;
       ctx.drawImage(
         videoTempCanvas,
-        (canvas.width - bloodVideo.videoWidth * vScale) / 2,
-        0,
+        currentCenterX - (bloodVideo.videoWidth * vScale) / 2,
+        currentCenterY - (bloodVideo.videoHeight * vScale) / 2,
         bloodVideo.videoWidth * vScale,
-        canvas.height
+        bloodVideo.videoHeight * vScale
       );
       ctx.restore();
       // debug
@@ -614,7 +617,7 @@ function update(dt) {
 
   // Appliquer la transformation une seule fois pour toutes les particules
   ctx.save();
-  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.translate(currentCenterX, currentCenterY);
   ctx.scale(scale, scale);
   ctx.translate(-refWidth / 2, -refHeight / 2);
 
@@ -663,6 +666,19 @@ function update(dt) {
   // debug
 }
 
+// Système de responsive : on garde toujours les éléments centrés
+function updateResponsivePositions() {
+  currentCenterX = canvas.width / 2;
+  currentCenterY = canvas.height / 2;
+}
+
+window.addEventListener("resize", () => {
+  updateResponsivePositions();
+  // Invalider les canvas de cache pour forcer leur recréation
+  rednessCanvas = null;
+  rednessBufferCanvas = null;
+});
+
 run(update);
 
 // Pré-initialisation hors boucle pour éviter le freeze sur la 1ère frame
@@ -686,9 +702,9 @@ run(update);
       rednessCanvas.width = canvas.width;
       rednessCanvas.height = canvas.height;
       rednessCtx = rednessCanvas.getContext("2d");
-      const rednessScale = canvas.height / refHeight;
+      const rednessScale = 1; // Garder la taille fixe
       rednessCtx.save();
-      rednessCtx.translate(canvas.width / 2, canvas.height / 2);
+      rednessCtx.translate(currentCenterX, currentCenterY);
       rednessCtx.scale(rednessScale, rednessScale);
       rednessCtx.translate(-refWidth / 2, -refHeight / 2);
       const g = rednessCtx.createRadialGradient(

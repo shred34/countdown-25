@@ -211,6 +211,11 @@ class Hair {
 }
 
 // Génère les cheveux sur le chiffre 3
+// Réinitialiser complètement pour éviter les duplications
+hairs = [];
+fallingHairs = [];
+hairOffsets = [];
+
 centerX = canvas.width / 2;
 centerY = canvas.height / 2;
 
@@ -239,8 +244,8 @@ for (let i = 0; i < 25000; i++) {
   }
 }
 
-// Recalcule les positions au redimensionnement
-window.addEventListener("resize", () => {
+// Fonction pour recalculer les positions
+function updateHairPositions() {
   centerX = canvas.width / 2;
   centerY = canvas.height / 2;
   hairs.forEach((h, i) => {
@@ -248,7 +253,13 @@ window.addEventListener("resize", () => {
     h.y = centerY + hairOffsets[i].y;
   });
   fallingHairs = [];
-});
+}
+
+// Recalcule les positions au redimensionnement
+window.addEventListener("resize", updateHairPositions);
+
+// Assure que les positions sont correctes dès le départ
+updateHairPositions();
 
 // Rotation d'un point autour du pivot
 function rotPt(x, y, a) {

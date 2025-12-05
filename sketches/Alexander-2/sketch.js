@@ -65,19 +65,32 @@ function loadHandImages() {
 loadHandImages();
 
 const maskCanvas = document.createElement("canvas");
-maskCanvas.width = canvas.width;
-maskCanvas.height = canvas.height;
 const maskCtx = maskCanvas.getContext("2d");
-maskCtx.fillStyle = "white";
-maskCtx.font = "bold 1200px Helvetica";
-maskCtx.textAlign = "center";
-maskCtx.textBaseline = "middle";
-maskCtx.fillText("2", canvas.width / 2, canvas.height / 2);
-
 const tempCanvas = document.createElement("canvas");
-tempCanvas.width = canvas.width;
-tempCanvas.height = canvas.height;
 const tempCtx = tempCanvas.getContext("2d");
+
+function initializeCanvases() {
+  // Initialiser centerX et centerY en PREMIER
+  centerX = canvas.width / 2;
+  centerY = canvas.height / 2;
+
+  maskCanvas.width = canvas.width;
+  maskCanvas.height = canvas.height;
+  maskCtx.fillStyle = "white";
+  maskCtx.font = "bold 1200px Helvetica";
+  maskCtx.textAlign = "center";
+  maskCtx.textBaseline = "middle";
+  maskCtx.fillText("2", centerX, centerY);
+
+  tempCanvas.width = canvas.width;
+  tempCanvas.height = canvas.height;
+}
+
+initializeCanvases();
+
+window.addEventListener("resize", () => {
+  initializeCanvases();
+});
 
 class Pimple {
   constructor(x, y, index) {
@@ -143,8 +156,8 @@ class Pimple {
       this.explodeTime += dt;
       for (let jet of this.jets)
         for (let p of jet) {
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
+          p.offsetX += p.vx * dt;
+          p.offsetY += p.vy * dt;
           const d = Math.pow(p.drag, dt * 60);
           p.vx *= d;
           p.vy *= d;
@@ -177,8 +190,8 @@ class Pimple {
             : [300 + Math.random() * 200, 3 + Math.random() * 5];
 
         particles.push({
-          x: this.x,
-          y: this.y,
+          offsetX: 0, // Position relative au bouton
+          offsetY: 0,
           vx: Math.cos(angle) * maxDist * 2.4,
           vy: Math.sin(angle) * maxDist * 2.4,
           size,
@@ -197,33 +210,46 @@ class Pimple {
 
     this.edgeParticles = [];
     this.outsideParticles = [];
-    const innerParticles = [];
+    this.innerParticles = [];
 
     for (let jet of this.jets) {
       for (let p of jet) {
         const status = this.checkParticlePosition(p);
-        if (status === "edge") this.edgeParticles.push(p);
-        else if (status === "outside") this.outsideParticles.push(p);
-        else innerParticles.push(p);
+        // Stocker en position relative au centre (comme pimpleOffsets)
+        const relativeParticle = {
+          offsetX: p.offsetX + (this.x - centerX),
+          offsetY: p.offsetY + (this.y - centerY),
+          size: p.size,
+        };
+        if (status === "edge") this.edgeParticles.push(relativeParticle);
+        else if (status === "outside")
+          this.outsideParticles.push(relativeParticle);
+        else this.innerParticles.push(relativeParticle);
       }
     }
 
     ctx.fillStyle = "rgba(231, 226, 200, 0.85)";
     ctx.beginPath();
-    for (let p of innerParticles) {
-      ctx.moveTo(p.x + p.size, p.y);
-      ctx.arc(p.x, p.y, p.size, 0, TWO_PI);
+    for (let p of this.innerParticles) {
+      const px = centerX + p.offsetX;
+      const py = centerY + p.offsetY;
+      ctx.moveTo(px + p.size, py);
+      ctx.arc(px, py, p.size, 0, TWO_PI);
     }
     ctx.fill();
 
     this.splashReady = true;
     this.fadeOutProgress = 0;
+    // Sauvegarder les jets pour pouvoir recréer le splash après resize
+    this.savedJets = this.jets;
     this.jets = [];
   }
 
   checkParticlePosition(p) {
     const checks = 6;
     let insideCount = 0;
+    const px = this.x + p.offsetX;
+    const py = this.y + p.offsetY;
     if (!this.maskImageData)
       this.maskImageData = maskCtx.getImageData(
         0,
@@ -235,8 +261,8 @@ class Pimple {
 
     for (let i = 0; i < checks; i++) {
       const angle = (i / checks) * TWO_PI;
-      const checkX = Math.round(p.x + Math.cos(angle) * p.size);
-      const checkY = Math.round(p.y + Math.sin(angle) * p.size);
+      const checkX = Math.round(px + Math.cos(angle) * p.size);
+      const checkY = Math.round(py + Math.sin(angle) * p.size);
 
       if (
         checkX >= 0 &&
@@ -260,8 +286,10 @@ class Pimple {
       ctx.beginPath();
       for (let jet of this.jets) {
         for (let p of jet) {
-          ctx.moveTo(p.x + p.size, p.y);
-          ctx.arc(p.x, p.y, p.size, 0, TWO_PI);
+          const px = this.x + p.offsetX;
+          const py = this.y + p.offsetY;
+          ctx.moveTo(px + p.size, py);
+          ctx.arc(px, py, p.size, 0, TWO_PI);
         }
       }
       ctx.fill();
@@ -294,9 +322,7 @@ class Pimple {
   }
 }
 
-centerX = canvas.width / 2;
-centerY = canvas.height / 2;
-
+// centerX et centerY sont déjà définis dans initializeCanvases()
 const tc = document.createElement("canvas");
 tc.width = canvas.width;
 tc.height = canvas.height;
@@ -351,9 +377,34 @@ for (let i = 0; i < num && validPos.length > 0; i++) {
 window.addEventListener("resize", () => {
   centerX = canvas.width / 2;
   centerY = canvas.height / 2;
+
   pimples.forEach((p, i) => {
     p.x = centerX + pimpleOffsets[i].x;
     p.y = centerY + pimpleOffsets[i].y;
+
+    // Recréer le splashCanvas avec les nouvelles coordonnées
+    if (p.splashReady && p.edgeParticles && p.edgeParticles.length > 0) {
+      // Redessiner le splashCanvas avec centerX/centerY à jour
+      p.splashCanvas.width = canvas.width;
+      p.splashCanvas.height = canvas.height;
+      const ctx = p.splashCanvas.getContext("2d");
+
+      ctx.fillStyle = "rgba(231, 226, 200, 0.85)";
+      ctx.beginPath();
+
+      // Redessiner les particules internes avec les nouveaux centres
+      // On doit les recalculer depuis edgeParticles et outsideParticles
+      // En fait, stockons aussi les innerParticles
+      if (p.innerParticles) {
+        for (let particle of p.innerParticles) {
+          const px = centerX + particle.offsetX;
+          const py = centerY + particle.offsetY;
+          ctx.moveTo(px + particle.size, py);
+          ctx.arc(px, py, particle.size, 0, TWO_PI);
+        }
+        ctx.fill();
+      }
+    }
   });
 });
 
@@ -466,8 +517,10 @@ function update(dt) {
       ctx.fillStyle = `rgba(231, 226, 200, ${alpha})`;
       ctx.beginPath();
       for (let particle of p.outsideParticles) {
-        ctx.moveTo(particle.x + particle.size, particle.y);
-        ctx.arc(particle.x, particle.y, particle.size, 0, TWO_PI);
+        const px = centerX + particle.offsetX;
+        const py = centerY + particle.offsetY;
+        ctx.moveTo(px + particle.size, py);
+        ctx.arc(px, py, particle.size, 0, TWO_PI);
       }
       ctx.fill();
     }
@@ -497,8 +550,10 @@ function update(dt) {
     pimples.forEach((p) => {
       if (p.popped && p.edgeParticles) {
         for (let particle of p.edgeParticles) {
-          ctx.moveTo(particle.x + particle.size, particle.y);
-          ctx.arc(particle.x, particle.y, particle.size, 0, TWO_PI);
+          const px = centerX + particle.offsetX;
+          const py = centerY + particle.offsetY;
+          ctx.moveTo(px + particle.size, py);
+          ctx.arc(px, py, particle.size, 0, TWO_PI);
         }
       }
     });
