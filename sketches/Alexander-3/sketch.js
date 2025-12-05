@@ -28,7 +28,8 @@ let time = 0,
   lastMY = 0,
   cutting = false,
   wasDown = false,
-  finishCalled = false;
+  finishCalled = false,
+  fadeIn = 0;
 const pivot = { x: 313, y: 83 },
   scale = 0.8;
 
@@ -38,9 +39,9 @@ const TWO_PI = Math.PI * 2;
 
 // Charge les trois sons
 const sounds = {
-  razor: new Audio("../sample-audio/assets/rasoir.mp3"),
-  open: new Audio("../sample-audio/assets/open.mp3"),
-  close: new Audio("../sample-audio/assets/close.mp3"),
+  razor: new Audio("./assets/rasoir.mp3"),
+  open: new Audio("./assets/open.mp3"),
+  close: new Audio("./assets/close.mp3"),
 };
 sounds.razor.volume = 1.0;
 
@@ -107,7 +108,7 @@ class FallingHair {
       p.endx + this.bx,
       p.endy + this.by
     );
-    ctx.strokeStyle = "#fff";
+    ctx.strokeStyle = "#000";
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
@@ -173,7 +174,7 @@ class Hair {
     if (this.cut) {
       // Cheveu coupé : juste un point
       if (o > 0.01) {
-        ctx.fillStyle = `rgba(255,255,255,${o})`;
+        ctx.fillStyle = `rgba(0,0,0,${o})`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, 2, 0, TWO_PI);
         ctx.fill();
@@ -194,13 +195,13 @@ class Hair {
           this.x + (p.endx + bx) * g,
           this.y + (p.endy + by) * g
         );
-        ctx.strokeStyle = "#fff";
+        ctx.strokeStyle = "#000";
         ctx.lineWidth = 2;
         ctx.stroke();
       }
       // Point à la racine
       if (o > 0.01) {
-        ctx.fillStyle = `rgba(255,255,255,${o})`;
+        ctx.fillStyle = `rgba(0,0,0,${o})`;
         ctx.beginPath();
         ctx.arc(this.x, this.y, 2, 0, TWO_PI);
         ctx.fill();
@@ -291,30 +292,76 @@ function getSurfacePts(x, y, s, a) {
   return pts;
 }
 
-// Dessine le rasoir
+// Dessine le rasoir avec effet acier
 function drawRazor(x, y, s, a, r) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(r);
   ctx.scale(s, s);
   ctx.translate(-pivot.x, -pivot.y);
+
+  // Lame du rasoir avec dégradé acier intense
   ctx.save();
   ctx.translate(pivot.x, pivot.y);
   ctx.rotate(-a);
   ctx.translate(-pivot.x, -pivot.y);
-  ctx.fillStyle = "#fff";
+
+  // Dégradé acier intense pour la lame
+  const bladeGradient = ctx.createLinearGradient(0, 0, 400, 100);
+  bladeGradient.addColorStop(0, "#374151"); // Gris foncé
+  bladeGradient.addColorStop(0.15, "#9ca3af"); // Gris acier
+  bladeGradient.addColorStop(0.25, "#ffffff"); // Reflet blanc vif
+  bladeGradient.addColorStop(0.35, "#d1d5db"); // Gris clair
+  bladeGradient.addColorStop(0.5, "#6b7280"); // Gris moyen
+  bladeGradient.addColorStop(0.65, "#f0f0f0"); // Reflet blanc
+  bladeGradient.addColorStop(0.75, "#b0b8c4"); // Gris acier clair
+  bladeGradient.addColorStop(0.85, "#ffffff"); // Reflet vif
+  bladeGradient.addColorStop(1, "#4b5563"); // Gris foncé
+
+  ctx.fillStyle = bladeGradient;
   ctx.fill(
     new Path2D(
       "M6.48,38.85l186.06,64.73c4.12,1.43,8.69-.09,11.14-3.7l9.86-14.6c1.86-2.76,5-4.36,8.33-4.23,14.77.58,56.59,4.6,85.18,30.96,28.57,26.34,57.95,24.59,68.06,22.99,3.17-.5,5.99-2.53,7.18-5.5,1.51-3.78.38-8.84-13.76-11.3l-10.67-1.86c-8.97-1.56-17.63-4.61-25.59-9.03l-52.42-29.03c-4.91-2.72-10.09-4.94-15.45-6.61L38.47,1.03c-4.57-1.43-9.5-1.39-13.99.28C17.7,3.83,8.61,10.12.98,25.55c-2.55,5.16.06,11.41,5.5,13.3Z"
     )
   );
+
+  // Contour de la lame
+  ctx.strokeStyle = "#1f2937";
+  ctx.lineWidth = 1.5;
+  ctx.stroke(
+    new Path2D(
+      "M6.48,38.85l186.06,64.73c4.12,1.43,8.69-.09,11.14-3.7l9.86-14.6c1.86-2.76,5-4.36,8.33-4.23,14.77.58,56.59,4.6,85.18,30.96,28.57,26.34,57.95,24.59,68.06,22.99,3.17-.5,5.99-2.53,7.18-5.5,1.51-3.78.38-8.84-13.76-11.3l-10.67-1.86c-8.97-1.56-17.63-4.61-25.59-9.03l-52.42-29.03c-4.91-2.72-10.09-4.94-15.45-6.61L38.47,1.03c-4.57-1.43-9.5-1.39-13.99.28C17.7,3.83,8.61,10.12.98,25.55c-2.55,5.16.06,11.41,5.5,13.3Z"
+    )
+  );
   ctx.restore();
-  ctx.fillStyle = "#fff";
+
+  // Manche du rasoir en bois brun
+  const handleGradient = ctx.createLinearGradient(280, 80, 380, 80);
+  handleGradient.addColorStop(0, "#5c3d2e"); // Brun foncé
+  handleGradient.addColorStop(0.15, "#8b5a3c"); // Brun moyen
+  handleGradient.addColorStop(0.3, "#a0674b"); // Brun clair (reflet)
+  handleGradient.addColorStop(0.45, "#6b4532"); // Brun
+  handleGradient.addColorStop(0.6, "#8b5a3c"); // Brun moyen
+  handleGradient.addColorStop(0.75, "#a86f4d"); // Reflet bois
+  handleGradient.addColorStop(0.9, "#6b4532"); // Brun
+  handleGradient.addColorStop(1, "#4a3225"); // Brun très foncé
+
+  ctx.fillStyle = handleGradient;
   ctx.fill(
     new Path2D(
       "M339.08,83.87c-5.84-9.8-21.55-10.87-24.09.26-2.96,12.95-1.08,41.63-1.88,80.42-1.78,85.86-35.78,230.43-46.48,260.72-2.83,8-3.34,16.67-1.34,24.91,12.09,49.87,63.37,42.32,68.56,19.52,25.36-111.44,26.35-287.51,26.35-287.51,0,0,1.82-59.85-21.1-98.32Z"
     )
   );
+
+  // Contour du manche
+  ctx.strokeStyle = "#3d261a";
+  ctx.lineWidth = 1.5;
+  ctx.stroke(
+    new Path2D(
+      "M339.08,83.87c-5.84-9.8-21.55-10.87-24.09.26-2.96,12.95-1.08,41.63-1.88,80.42-1.78,85.86-35.78,230.43-46.48,260.72-2.83,8-3.34,16.67-1.34,24.91,12.09,49.87,63.37,42.32,68.56,19.52,25.36-111.44,26.35-287.51,26.35-287.51,0,0,1.82-59.85-21.1-98.32Z"
+    )
+  );
+
   ctx.restore();
 }
 
@@ -328,6 +375,9 @@ function update(dt) {
   const moving = my > lastMY;
   lastMY = my;
 
+  // Transition du noir au beige au début
+  if (fadeIn < 1) fadeIn = Math.min(fadeIn + dt * 0.5, 1);
+
   // Les cheveux poussent progressivement
   if (growth < 1 && time > 0.5) growth = Math.min((time - 0.5) / 2, 1);
 
@@ -336,14 +386,14 @@ function update(dt) {
   if (allCut && cutTime === -1) cutTime = time;
 
   // Animations après la fin
-  let fade = 0,
+  let fadeOut = 0,
     fall = false;
   if (cutTime !== -1) {
     const t = time - cutTime;
-    if (t > 0.5) fade = Math.min((t - 0.5) / 0.3, 1);
-    if (t > 0.8) fall = true;
-    // Appeler finish() après que le rasoir soit tombé (2.5 sec après cutTime)
-    if (t > 2.5 && !finishCalled) {
+    if (t > 0.5) fall = true;
+    if (t > 1.5) fadeOut = Math.min((t - 1.5) / 1, 1);
+    // Appeler finish() quand l'écran est complètement noir
+    if (fadeOut >= 1 && !finishCalled) {
       finishCalled = true;
       finish();
     }
@@ -378,8 +428,15 @@ function update(dt) {
   prevBladeAngle = bladeAngle;
   bladeAngle += ((down ? 0 : Math.PI / 2) - bladeAngle) * 0.15;
 
-  ctx.fillStyle = "black";
+  // Fond noir puis peau beige (transition du noir au beige)
+  ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Dessiner le fond beige avec fadeIn
+  if (fadeIn > 0) {
+    ctx.fillStyle = `rgba(248, 192, 165, ${fadeIn})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
   // Détecte les collisions
   const surf = getSurfacePts(razorX, razorY, scale, bladeAngle);
@@ -430,9 +487,15 @@ function update(dt) {
     else fallingHairs[i].draw(ctx);
   }
 
-  hairs.forEach((h) => h.draw(ctx, growth, fade));
+  hairs.forEach((h) => h.draw(ctx, growth, fadeOut));
   if (onCanvas && razorY > -200 && razorY < canvas.height + 300)
     drawRazor(razorX, razorY, scale, bladeAngle, razorRot);
+
+  // Overlay noir pour le fadeOut final (transition du beige au noir)
+  if (fadeOut > 0) {
+    ctx.fillStyle = `rgba(0, 0, 0, ${fadeOut})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 }
 
 run(update);
