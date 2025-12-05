@@ -568,12 +568,14 @@ function update(dt) {
   });
 
   // Configuration des mains et bras (toujours affichées)
+  // Scale responsive basé sur la largeur du canvas (référence: 1920px)
+  const handScale = canvas.width / 1920;
   const gap = fingerGapSpring.position,
-    handWidth = 2400,
-    handHeight = 300,
-    handOffset = 1200,
-    fingerSpacing = 1142,
-    armY = handMy - handHeight / 2 + 50 + 71.5;
+    handWidth = 2400 * handScale,
+    handHeight = 300 * handScale,
+    handOffset = 1200 * handScale,
+    fingerSpacing = 1142 * handScale,
+    armY = handMy - handHeight / 2 + 50 * handScale + 71.5 * handScale;
 
   // Animations d'arrivee et depart avec smoothstep
   const intro =
@@ -616,18 +618,18 @@ function update(dt) {
     );
 
   // Dessiner les bras
-  const armExtensionWidth = 3000;
-  const armExtensionHeight = 169;
+  const armExtensionWidth = 3000 * handScale;
+  const armExtensionHeight = 169 * handScale;
   const armColor = "#f8c0a5";
 
   // Bras gauche
-  const leftArmX = leftHandX + handWidth - 80;
+  const leftArmX = leftHandX + handWidth - 80 * handScale;
   const leftArmY = armY;
 
   ctx.fillStyle = armColor;
   ctx.fillRect(leftArmX, leftArmY, armExtensionWidth, armExtensionHeight);
   ctx.strokeStyle = "black";
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.5 * handScale;
   ctx.beginPath();
   ctx.moveTo(leftArmX, leftArmY);
   ctx.lineTo(leftArmX + armExtensionWidth, leftArmY);
@@ -638,13 +640,13 @@ function update(dt) {
   ctx.stroke();
 
   // Bras droit
-  const rightArmX = rightHandX - armExtensionWidth + 80;
+  const rightArmX = rightHandX - armExtensionWidth + 80 * handScale;
   const rightArmY = armY;
 
   ctx.fillStyle = armColor;
   ctx.fillRect(rightArmX, rightArmY, armExtensionWidth, armExtensionHeight);
   ctx.strokeStyle = "black";
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2.5 * handScale;
   ctx.beginPath();
   ctx.moveTo(rightArmX, rightArmY);
   ctx.lineTo(rightArmX + armExtensionWidth, rightArmY);

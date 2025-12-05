@@ -42,7 +42,13 @@ canvas.style.cursor = "none";
 const TWO_PI = Math.PI * 2;
 
 // Configuration du coton-tige
-const SWAB_SCALE = 3.4;
+// Scale adaptatif : utilise 3.4 pour petit/moyen écran, mais se limite pour grand écran
+function getSwabScale() {
+  const baseScale = 3.4;
+  const screenRatio = Math.min(canvas.width / 1920, canvas.height / 1080);
+  // Limiter le scale pour qu'il ne grossisse pas trop sur grand écran
+  return baseScale * Math.min(screenRatio, 1.2);
+}
 const SWAB_PIVOT = { x: 150, y: 75 };
 const COTTON_TOP = { x: 100, y: 10, radius: 10 };
 const COTTON_BOTTOM = { x: 200, y: 140, radius: 10 };
@@ -124,13 +130,14 @@ function rotatePoint(x, y, angle, pivot) {
 }
 
 function getCottonCenters(x, y, scale, rotation) {
+  const adaptiveScale = getSwabScale();
   const centers = [];
   const cottons = [COTTON_TOP, COTTON_BOTTOM];
   for (let cotton of cottons) {
     const rotated = rotatePoint(cotton.x, cotton.y, rotation, SWAB_PIVOT);
     centers.push({
-      x: x + (rotated.x - SWAB_PIVOT.x) * scale,
-      y: y + (rotated.y - SWAB_PIVOT.y) * scale,
+      x: x + (rotated.x - SWAB_PIVOT.x) * adaptiveScale,
+      y: y + (rotated.y - SWAB_PIVOT.y) * adaptiveScale,
     });
   }
   return centers; // [topCenter, bottomCenter]
@@ -138,10 +145,11 @@ function getCottonCenters(x, y, scale, rotation) {
 
 function drawSwab(x, y, scale, rotation) {
   if (!svgImages.swab) return;
+  const adaptiveScale = getSwabScale();
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rotation);
-  ctx.scale(scale, scale);
+  ctx.scale(adaptiveScale, adaptiveScale);
   ctx.translate(-SWAB_PIVOT.x, -SWAB_PIVOT.y);
 
   // Dessiner le coton-tige blanc
@@ -201,11 +209,13 @@ function drawSwab(x, y, scale, rotation) {
 
     if (level >= 1) {
       // Niveau 1: Petites taches organiques (15%)
+      // Adapter la taille au scale du coton-tige
+      const scaleRatio = getSwabScale() / 3.4;
       ctx.globalAlpha = 0.75;
       for (let i = 0; i < 3; i++) {
         const angle = (i / 3) * TWO_PI + seed;
-        const dist = cotton.radius * 0.2;
-        const size = cotton.radius * 0.15;
+        const dist = cotton.radius * 0.2 * scaleRatio;
+        const size = cotton.radius * 0.15 * scaleRatio;
         drawOrganicBlob(
           cotton.x + Math.cos(angle) * dist,
           cotton.y + Math.sin(angle) * dist,
@@ -217,11 +227,12 @@ function drawSwab(x, y, scale, rotation) {
 
     if (level >= 2) {
       // Niveau 2: Plus de taches, zone élargie (30%)
+      const scaleRatio = getSwabScale() / 3.4;
       ctx.globalAlpha = 0.8;
       for (let i = 0; i < 6; i++) {
         const angle = (i / 6) * TWO_PI + seed * 0.7;
-        const dist = cotton.radius * (0.15 + (i % 2) * 0.25);
-        const size = cotton.radius * (0.12 + (i % 3) * 0.08);
+        const dist = cotton.radius * (0.15 + (i % 2) * 0.25) * scaleRatio;
+        const size = cotton.radius * (0.12 + (i % 3) * 0.08) * scaleRatio;
         drawOrganicBlob(
           cotton.x + Math.cos(angle) * dist,
           cotton.y + Math.sin(angle) * dist,
@@ -230,16 +241,22 @@ function drawSwab(x, y, scale, rotation) {
         );
       }
       // Centre organique
-      drawOrganicBlob(cotton.x, cotton.y, cotton.radius * 0.25, seed + 10);
+      drawOrganicBlob(
+        cotton.x,
+        cotton.y,
+        cotton.radius * 0.25 * scaleRatio,
+        seed + 10
+      );
     }
 
     if (level >= 3) {
       // Niveau 3: Presque plein avec taches organiques (45%)
+      const scaleRatio = getSwabScale() / 3.4;
       ctx.globalAlpha = 0.85;
       for (let i = 0; i < 10; i++) {
         const angle = (i / 10) * TWO_PI + seed * 0.9;
-        const dist = cotton.radius * (0.1 + (i % 4) * 0.2);
-        const size = cotton.radius * (0.15 + (i % 3) * 0.1);
+        const dist = cotton.radius * (0.1 + (i % 4) * 0.2) * scaleRatio;
+        const size = cotton.radius * (0.15 + (i % 3) * 0.1) * scaleRatio;
         drawOrganicBlob(
           cotton.x + Math.cos(angle) * dist,
           cotton.y + Math.sin(angle) * dist,
@@ -248,13 +265,24 @@ function drawSwab(x, y, scale, rotation) {
         );
       }
       // Zone centrale large organique
-      drawOrganicBlob(cotton.x, cotton.y, cotton.radius * 0.5, seed + 20);
+      drawOrganicBlob(
+        cotton.x,
+        cotton.y,
+        cotton.radius * 0.5 * scaleRatio,
+        seed + 20
+      );
     }
 
     if (level >= 4) {
       // Niveau 4: Complètement sale avec forme organique (50%)
+      const scaleRatio = getSwabScale() / 3.4;
       ctx.globalAlpha = 0.9;
-      drawOrganicBlob(cotton.x, cotton.y, cotton.radius * 0.95, seed + 30);
+      drawOrganicBlob(
+        cotton.x,
+        cotton.y,
+        cotton.radius * 0.95 * scaleRatio,
+        seed + 30
+      );
     }
   });
 
@@ -279,7 +307,7 @@ function getCleanPercentage() {
 function drawEarWithWax(fadeOut) {
   if (!svgImages.ear || !svgImages.earwax || !earwaxMaskCanvas) return;
 
-  const earScale = 3.4;
+  const earScale = getSwabScale();
   const earWidth = 161.16 * earScale;
   const earHeight = 239.46 * earScale;
   const earX = centerX - earWidth / 2;
@@ -431,6 +459,7 @@ function update(dt) {
   // EFFACEMENT au SURVOL (les DEUX cotons nettoient simultanément mais se tachent indépendamment)
   // IMPORTANT : Effacement désactivé pendant l'animation d'apparition (fadeIn < 1)
   if (onCanvas && !fall && fadeIn >= 1 && !bothCottonsFull) {
+    const adaptiveScale = getSwabScale();
     const cottons = [COTTON_TOP, COTTON_BOTTOM];
 
     // Pour chaque coton
@@ -446,8 +475,8 @@ function update(dt) {
             const py = cotton.y + Math.sin(angle) * cotton.radius * r;
             const rotated = rotatePoint(px, py, swabRotation, SWAB_PIVOT);
             swabPts.push({
-              x: swabX + (rotated.x - SWAB_PIVOT.x) * SWAB_SCALE,
-              y: swabY + (rotated.y - SWAB_PIVOT.y) * SWAB_SCALE,
+              x: swabX + (rotated.x - SWAB_PIVOT.x) * adaptiveScale,
+              y: swabY + (rotated.y - SWAB_PIVOT.y) * adaptiveScale,
             });
           }
         }
@@ -456,12 +485,12 @@ function update(dt) {
         const cottonCenter = {
           x:
             swabX +
-            (cotton.x - SWAB_PIVOT.x) * SWAB_SCALE * Math.cos(swabRotation) -
-            (cotton.y - SWAB_PIVOT.y) * SWAB_SCALE * Math.sin(swabRotation),
+            (cotton.x - SWAB_PIVOT.x) * adaptiveScale * Math.cos(swabRotation) -
+            (cotton.y - SWAB_PIVOT.y) * adaptiveScale * Math.sin(swabRotation),
           y:
             swabY +
-            (cotton.x - SWAB_PIVOT.x) * SWAB_SCALE * Math.sin(swabRotation) +
-            (cotton.y - SWAB_PIVOT.y) * SWAB_SCALE * Math.cos(swabRotation),
+            (cotton.x - SWAB_PIVOT.x) * adaptiveScale * Math.sin(swabRotation) +
+            (cotton.y - SWAB_PIVOT.y) * adaptiveScale * Math.cos(swabRotation),
         };
         const distToCenter = Math.hypot(
           cottonCenter.x - centerX,
@@ -511,7 +540,7 @@ function update(dt) {
 
   // Coton-tige
   if (onCanvas && swabY > -200 && swabY < canvas.height + 300) {
-    drawSwab(swabX, swabY, SWAB_SCALE, swabRotation);
+    drawSwab(swabX, swabY, getSwabScale(), swabRotation);
   }
 
   // Fade noir au début (par-dessus tout pour que le 0 et cérumen apparaissent en dessous)
